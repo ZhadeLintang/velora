@@ -29,8 +29,23 @@ export const uploadGalleryImage = async (payload: UploadPayload): Promise<string
 };
 
 // Persist image metadata in Supabase Database when a project table is available.
-export const createGalleryRecord = async (photo: Omit<GalleryPhoto, "creator" | "height">) => {
-  const { error } = await supabase.from("gallery_photos").insert(photo);
+export const createGalleryRecord = async (photo: {
+  image: string;
+  title: string;
+  description: string;
+  category: Category;
+  userId: string;
+}) => {
+  const { error } = await supabase.from("GALLERY_PHOTOS").insert({
+    image: photo.image,
+    title: photo.title,
+    description: photo.description,
+    category: photo.category,
+    likes: 0,
+    creator_id: photo.userId,
+    height: "medium",
+    featured: false,
+  });
 
   if (error) {
     throw new Error(error.message);
@@ -39,7 +54,7 @@ export const createGalleryRecord = async (photo: Omit<GalleryPhoto, "creator" | 
 
 // Delete flow removes both metadata and storage object in production integrations.
 export const deleteGalleryRecord = async (photoId: string) => {
-  const { error } = await supabase.from("gallery_photos").delete().eq("id", photoId);
+  const { error } = await supabase.from("GALLERY_PHOTOS").delete().eq("id", photoId);
 
   if (error) {
     throw new Error(error.message);

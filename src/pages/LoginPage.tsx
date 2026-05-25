@@ -10,6 +10,7 @@ export const LoginPage = () => {
   const [email, setEmail] = useState("demo@lumora.app");
   const [password, setPassword] = useState("lumora-demo");
   const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
   const { login } = useAuth();
   const { notify } = useToast();
   const navigate = useNavigate();
@@ -20,13 +21,16 @@ export const LoginPage = () => {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setErrorText(null);
 
     try {
       await login(email, password);
       notify("Welcome back to Lumora.", "success");
       navigate(from, { replace: true });
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Unable to login.", "error");
+      const msg = error instanceof Error ? error.message : "Unable to login.";
+      setErrorText(msg);
+      notify(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -44,6 +48,12 @@ export const LoginPage = () => {
           <Sparkles className="h-6 w-6" />
         </div>
         <h2 className="mt-6 text-2xl font-bold text-white">Welcome back</h2>
+        {errorText && (
+          <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200 backdrop-blur">
+            <p className="font-semibold">Authentication Notice</p>
+            <p className="mt-1 text-xs text-red-300/90 leading-5">{errorText}</p>
+          </div>
+        )}
         <label className="mt-6 block text-sm text-zinc-300">
           Email
           <span className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">

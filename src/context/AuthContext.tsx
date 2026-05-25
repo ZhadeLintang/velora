@@ -7,7 +7,7 @@ type AuthContextValue = {
   session: Session | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, fullName: string, username: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -21,17 +21,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
     // Supabase Auth session hydration runs once and then listens for login/register/logout changes.
     const hydrateSession = async () => {
-      if (!isSupabaseConfigured) {
-        setLoading(false);
-        return;
-      }
-
-      const { data } = await supabase.auth.getSession();
-      if (mounted) {
-        setSession(data.session);
-        setLoading(false);
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (mounted) {
+          setSession(data.session);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Supabase hydration error:", err);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -44,7 +51,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       mounted = false;
-      data.subscription.unsubscribe();
+      if (data?.subscription) {
+        data.subscription.unsubscribe();
+      }
     };
   }, []);
 
@@ -74,10 +83,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) {
+          if (error.message.toLowerCase().includes("email not confirmed")) {
+            throw new Error(
+              "Email address not confirmed. Please check your inbox, or go to your Supabase Dashboard -> Auth -> Providers -> Email and toggle 'Confirm email' OFF for development."
+            );
+          }
+          if (error.message.toLowerCase().includes("invalid login credentials")) {
+            throw new Error("Invalid email or password. Please make sure you have created an account first!");
+          }
           throw new Error(error.message);
         }
       },
-      register: async (email, password) => {
+      register: async (email, password, fullName, username) => {
+        const formattedUsername = username.startsWith("@") ? username : `@${username}`;
+
         if (!isSupabaseConfigured) {
           setSession({
             access_token: "demo-token",
@@ -87,7 +106,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             user: {
               id: "demo-user",
               app_metadata: {},
-              user_metadata: { full_name: "Lumora Demo" },
+              user_metadata: { full_name: fullName, username: formattedUsername },
               aud: "authenticated",
               created_at: new Date().toISOString(),
               email,
@@ -96,9 +115,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              username: formattedUsername,
+            },
+          },
+        });
+
         if (error) {
+          if (error.status === 500 || error.message.toLowerCase().includes("database error")) {
+            throw new Error(
+              "Database signup error (500). This occurs when a database trigger on new users fails. Please verify that your 'profiles' table and 'on_auth_user_created' trigger are correctly created in your Supabase SQL editor."
+            );
+          }
+          if (error.status === 429 || error.message.toLowerCase().includes("rate limit")) {
+            throw new Error("Email signup rate limit exceeded. Please wait a few minutes before trying again.");
+          }
           throw new Error(error.message);
+        }
+
+        // Proactive client-side profiles creation fallback in case triggers are not yet setup
+        if (data?.user) {
+          try {
+            await supabase.from("profiles").upsert({
+              id: data.user.id,
+              name: fullName,
+              handle: formattedUsername,
+              avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+            });
+          } catch (profileErr) {
+            console.warn("Client fallback profile creation warning:", profileErr);
+          }
         }
       },
       logout: async () => {

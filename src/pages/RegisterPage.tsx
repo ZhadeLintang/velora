@@ -13,6 +13,7 @@ export const RegisterPage = () => {
   const [email, setEmail] = useState("creator@lumora.app");
   const [password, setPassword] = useState("lumora-demo");
   const [loading, setLoading] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
   const { register } = useAuth();
   const { notify } = useToast();
   const navigate = useNavigate();
@@ -20,9 +21,10 @@ export const RegisterPage = () => {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
+    setErrorText(null);
 
     try {
-      await register(email, password);
+      await register(email, password, fullName, username);
       // Seed the editable profile with registration identity for demo mode and future Supabase profiles sync.
       saveEditableProfile({
         ...getEditableProfile(),
@@ -32,7 +34,9 @@ export const RegisterPage = () => {
       notify("Lumora account created.", "success");
       navigate("/dashboard");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Unable to register.", "error");
+      const msg = error instanceof Error ? error.message : "Unable to register.";
+      setErrorText(msg);
+      notify(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -45,6 +49,12 @@ export const RegisterPage = () => {
           <Sparkles className="h-6 w-6" />
         </div>
         <h2 className="mt-6 text-2xl font-bold text-white">Create your studio</h2>
+        {errorText && (
+          <div className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200 backdrop-blur">
+            <p className="font-semibold">Registration Notice</p>
+            <p className="mt-1 text-xs text-red-300/90 leading-5">{errorText}</p>
+          </div>
+        )}
         <label className="mt-6 block text-sm text-zinc-300">
           Full name
           <span className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">

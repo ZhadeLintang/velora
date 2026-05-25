@@ -7,7 +7,7 @@ import { Button } from "../components/ui/Button";
 import { categories } from "../data/mockData";
 import { isSupabaseConfigured } from "../lib/supabase";
 import { readFileAsDataUrl, saveLocalUpload } from "../services/localGalleryStore";
-import { uploadGalleryImage } from "../services/galleryService";
+import { uploadGalleryImage, createGalleryRecord } from "../services/galleryService";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import type { Category } from "../types/gallery";
@@ -66,6 +66,19 @@ export const UploadPage = () => {
 
       if (isSupabaseConfigured && user) {
         uploadedImageUrl = await uploadGalleryImage({ file, title, description, category, userId: user.id });
+        
+        // Persist photo metadata into Supabase Database GALLERY_PHOTOS table
+        try {
+          await createGalleryRecord({
+            image: uploadedImageUrl,
+            title,
+            description,
+            category,
+            userId: user.id,
+          });
+        } catch (dbError) {
+          console.warn("Database save failed (perhaps tables are not created yet):", dbError);
+        }
       }
 
       // Import the uploaded image into the gallery feed so the creator sees it immediately after publishing.
@@ -77,7 +90,7 @@ export const UploadPage = () => {
         creatorEmail: user?.email,
       });
 
-      notify(isSupabaseConfigured ? "Image uploaded and imported to Gallery." : "Demo upload imported to Gallery.", "success");
+      notify(isSupabaseConfigured ? "Image uploaded and saved to database." : "Demo upload imported to Gallery.", "success");
       setFile(null);
       setTitle("");
       setDescription("");

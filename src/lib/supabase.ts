@@ -1,15 +1,23 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
-// Supabase client reads environment variables so credentials never live in source control.
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? "";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
+// Load credentials supporting both Next.js process.env and Vite import.meta.env
+const supabaseUrl = 
+  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL) || 
+  import.meta.env.VITE_SUPABASE_URL || 
+  "https://oqqtqbbigbzgbmgxegwv.supabase.co";
 
-// A disabled client still lets the UI run with dummy content until real credentials are provided.
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+const supabaseAnonKey = 
+  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) || 
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 
+  "sb_publishable_P3bIaZ5Vx3mxBM1_YAoM5Q_w0FKxyOo";
 
-export const supabase = createClient(
-  supabaseUrl || "https://placeholder.supabase.co",
-  supabaseAnonKey || "placeholder-anon-key",
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export const isSupabaseConfigured = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  supabaseUrl !== "https://oqqtqbbigbzgbmgxegwv.supabase.co" &&
+  supabaseAnonKey !== "sb_publishable_P3bIaZ5Vx3mxBM1_YAoM5Q_w0FKxyOo"
 );
+export const storageBucket = "GALLERY";
 
-export const storageBucket = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET ?? "lumora-gallery";
